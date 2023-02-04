@@ -99,6 +99,7 @@ public:
     // to publish all as string representation.
     TextInfoSensor *staticGateEnergy = new TextInfoSensor();
     TextInfoSensor *motionGateEnergy = new TextInfoSensor();
+    TextInfoSensor *presence = new TextInfoSensor();
 
     Sensor *allSensitivity = new Sensor();
     TextSensor *version_sensor = new VersionSensor();
@@ -254,35 +255,6 @@ public:
         }
     }
 
-    void ESP_LOGD_HEX() {
-        std::string res;
-        char buf[256];
-        sprintf(buf, "Size: %d Expected %d ", dataBufferPos, expectedDataAmount);
-        res += buf;
-        for (size_t i = 0; i < dataBufferPos; i++) {
-            if (i > 0) {
-                res += ":";
-            }
-            sprintf(buf, "%02X", dataBuffer[i]);
-            res += buf;
-        }
-        ESP_LOGD(TAG, res.c_str());
-    }
-
-    void ESP_LOGD_HEX(std::vector <uint8_t> bytes, uint8_t separator) {
-        std::string res;
-        size_t len = bytes.size();
-        char buf[5];
-        for (size_t i = 0; i < len; i++) {
-            if (i > 0) {
-                res += separator;
-            }
-            sprintf(buf, "%02X", bytes[i]);
-            res += buf;
-        }
-        ESP_LOGD(TAG, res.c_str());
-    }
-
     bool sendCommand(uint16_t cmd, char *commandValue = nullptr, int commandValueLen = 0) {
         ESP_LOGI(TAG, ">>> %s (0x%04X)", commandWordAsString(cmd).c_str(), cmd);
 
@@ -404,6 +376,8 @@ public:
                 ESP_LOGW(TAG, "Unknown target data type: %02x", msg->type);
             }
         }
+
+        publishIfChanged(presence, targetStateAsString(msg->state).c_str());
 
         if (msg->type == 0x01) {
             std::string motionGate;
