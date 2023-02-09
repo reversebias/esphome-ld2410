@@ -99,6 +99,8 @@ public:
     // to publish all as string representation.
     TextInfoSensor *staticGateEnergy = new TextInfoSensor();
     TextInfoSensor *motionGateEnergy = new TextInfoSensor();
+    TextInfoSensor *staticGateEnergyMax = new TextInfoSensor();
+    TextInfoSensor *motionGateEnergyMax = new TextInfoSensor();
     TextInfoSensor *presence = new TextInfoSensor();
 
     Sensor *allSensitivity = new Sensor();
@@ -129,6 +131,9 @@ public:
     } frameState = HEADER;
 
     const std::vector <uint8_t> ld2410_end_conf = {0x04, 0x03, 0x02, 0x01};
+
+    uint8_t motionMaxHold[NUMBER_OF_GATES];
+    uint8_t staticMaxHold[NUMBER_OF_GATES];
 
     int dataBufferPos = 0;
     uint8_t dataBuffer[DATA_BUFFER_MAX_SIZE];
@@ -180,6 +185,8 @@ public:
         uint8_t maximumStaticGate;  // 8 == INDEX_OF_LAST_GATE always!?
         uint8_t motionGateEnergy[NUMBER_OF_GATES];
         uint8_t staticGateEnergy[NUMBER_OF_GATES];
+        uint8_t motionGateEnergyMax[NUMBER_OF_GATES];
+        uint8_t staticGateEnergyMax[NUMBER_OF_GATES];
         // uint8_t additionalInformation[16]; // M bytes "Retain data, store additional information"
         // ???
         // uint8_t end;                // 0x55 always
@@ -204,6 +211,8 @@ public:
 
         motionGateEnergy->set_internal(true);
         staticGateEnergy->set_internal(true);
+        motionGateEnergyMax->set_internal(true);
+        staticGateEnergyMax->set_internal(true);
 
 //        maxConfigDistance->set_unit_of_measurement("cm");
 //        maxConfigDistance->set_min_value(0);
@@ -382,19 +391,35 @@ public:
         if (msg->type == 0x01) {
             std::string motionGate;
             std::string staticGate;
+            std::string motionGateMax;
+            std::string staticGateMax;
             char buf[128];
             for (int i = 0; i < NUMBER_OF_GATES; i++) {
+                if (msg->motionGateEnergy[i] > motionMaxHold[i]) {
+                    motionMaxHold[i] = msg->motionGateEnergy[i];
+                }
+                if (msg->staticGateEnergy[i] > staticMaxHold[i]) {
+                    staticMaxHold[i] = msg->staticGateEnergy[i];
+                }
                 if (i > 0) {
                     motionGate += "|";
                     staticGate += "|";
+                    motionGateMax += "|";
+                    staticGateMax += "|";
                 }
                 sprintf(buf, "%3d", msg->motionGateEnergy[i]);
                 motionGate += buf;
                 sprintf(buf, "%3d", msg->staticGateEnergy[i]);
                 staticGate += buf;
+                sprintf(buf, "%3d", motionMaxHold[i]);
+                motionGateMax += buf;
+                sprintf(buf, "%3d", staticMaxHold[i]);
+                staticGateMax += buf;
             }
             publishIfChanged(motionGateEnergy, motionGate);
             publishIfChanged(staticGateEnergy, staticGate);
+            publishIfChanged(motionGateEnergyMax, motionGateMax);
+            publishIfChanged(staticGateEnergyMax, staticGateMax);
         }
 
         if (show_stats->state && (msg->type == 0x02 || msg->type == 0x01)) {
@@ -422,6 +447,8 @@ public:
                 id(show_engineering_stats).publish_state(false);
                 id(staticGateEnergy).publish_state("-");
                 id(motionGateEnergy).publish_state("-");
+                id(staticGateEnergyMax).publish_state("-");
+                id(motionGateEnergyMax).publish_state("-");
                 break;
             }
             case READ_FIRMWARE_VERSION | RESPONSE: { // Firmware Version ACK
@@ -639,6 +666,10 @@ public:
     void setEngineeringMode(bool engenable) {
         setConfigMode(true);
         sendCommand(engenable ? COMMAND::ENGINEERING_START : COMMAND::ENGINEERING_END);
+        for (int i = 0; i < NUMBER_OF_GATES; i++) {
+            motionMaxHold[i] = 0;
+            staticMaxHold[i] = 0;
+        }
         setConfigMode(false);
     }
 
